@@ -58,6 +58,7 @@ type EditTaskFormValues = {
 
 type TaskFormErrors = {
   title?: string;
+  dueDate?: string;
 };
 
 const taskTitleSchema = z.string().trim().min(1, "Title is required").max(255);
@@ -164,6 +165,23 @@ function getDateInputValue(value: string | null) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function isValidDateInput(value: string) {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return false;
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() + 1 === month &&
+    date.getDate() === day
+  );
 }
 
 function getResponseErrorMessage(data: unknown, fallbackMessage: string) {
@@ -728,10 +746,10 @@ export default function TasksPage() {
       [field]: value,
     }));
 
-    if (field === "title") {
+    if (field === "title" || field === "dueDate") {
       setCreateErrors((current) => ({
         ...current,
-        title: undefined,
+        [field]: undefined,
       }));
     }
 
@@ -769,10 +787,10 @@ export default function TasksPage() {
         : current,
     );
 
-    if (field === "title") {
+    if (field === "title" || field === "dueDate") {
       setEditErrors((current) => ({
         ...current,
-        title: undefined,
+        [field]: undefined,
       }));
     }
 
@@ -783,9 +801,15 @@ export default function TasksPage() {
     event.preventDefault();
 
     const titleError = validateTitle(createForm.title);
+    const dueDateError = isValidDateInput(createForm.dueDate)
+      ? ""
+      : "Use date format YYYY-MM-DD";
 
-    if (titleError) {
-      setCreateErrors({ title: titleError });
+    if (titleError || dueDateError) {
+      setCreateErrors({
+        title: titleError || undefined,
+        dueDate: dueDateError || undefined,
+      });
       return;
     }
 
@@ -858,9 +882,15 @@ export default function TasksPage() {
     }
 
     const titleError = validateTitle(editForm.title);
+    const dueDateError = isValidDateInput(editForm.dueDate)
+      ? ""
+      : "Use date format YYYY-MM-DD";
 
-    if (titleError) {
-      setEditErrors({ title: titleError });
+    if (titleError || dueDateError) {
+      setEditErrors({
+        title: titleError || undefined,
+        dueDate: dueDateError || undefined,
+      });
       return;
     }
 

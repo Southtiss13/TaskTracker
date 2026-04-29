@@ -7,6 +7,7 @@ type TaskCreateFormProps = {
   };
   errors: {
     title?: string;
+    dueDate?: string;
   };
   apiError: string;
   isSubmitting: boolean;
@@ -124,21 +125,33 @@ export function TaskCreateForm({
               </div>
 
               <div className="min-w-0 space-y-2">
-                <label
-                  htmlFor="create-dueDate"
-                  className="text-sm font-medium text-[#00033D]"
+              <label
+                htmlFor="create-dueDate"
+                className="text-sm font-medium text-[#00033D]"
                 >
                   Due date
                 </label>
-                <input
-                  id="create-dueDate"
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(event) => onChange("dueDate", event.target.value)}
-                  className="w-full max-w-full min-w-0 rounded-2xl border border-[#00033D]/12 bg-[#F9F7FC] px-4 py-3 text-base outline-none transition focus:border-[#977DFF] focus:bg-white focus:ring-4 focus:ring-[#977DFF]/12"
-                />
-              </div>
+              <input
+                id="create-dueDate"
+                type="text"
+                value={form.dueDate}
+                onChange={(event) => onChange("dueDate", event.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
+                placeholder="YYYY-MM-DD"
+                aria-invalid={Boolean(errors.dueDate)}
+                aria-describedby={
+                  errors.dueDate ? "create-dueDate-error" : undefined
+                }
+                className="w-full max-w-full min-w-0 rounded-2xl border border-[#00033D]/12 bg-[#F9F7FC] px-4 py-3 text-base outline-none transition focus:border-[#977DFF] focus:bg-white focus:ring-4 focus:ring-[#977DFF]/12"
+              />
+              {errors.dueDate ? (
+                <p id="create-dueDate-error" className="text-sm text-[#C13274]">
+                  {errors.dueDate}
+                </p>
+              ) : null}
             </div>
+          </div>
 
             {apiError ? (
               <div className="rounded-2xl border border-[#FFCFF2] bg-[#FFF4FB] px-4 py-3 text-sm text-[#9E1F61]">
