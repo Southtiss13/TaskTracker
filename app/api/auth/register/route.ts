@@ -1,5 +1,3 @@
-import { Prisma } from "@prisma/client";
-
 import { hashPassword } from "@/src/lib/password";
 import { prisma } from "@/src/lib/prisma";
 import { registerSchema } from "@/src/lib/validations/auth";
@@ -56,16 +54,6 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof SyntaxError) {
       return Response.json({ error: "Invalid input" }, { status: 400 });
-    }
-
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return Response.json(
-        { error: "An account with this email already exists" },
-        { status: 409 }
-      );
     }
 
     console.error("Register error:", error);
