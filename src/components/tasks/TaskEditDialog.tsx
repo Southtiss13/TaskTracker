@@ -1,3 +1,5 @@
+import { TaskDateInput } from "@/src/components/tasks/TaskDateInput";
+
 type TaskEditDialogProps = {
   task: {
     title: string;
@@ -150,32 +152,17 @@ export function TaskEditDialog({
                 </select>
               </div>
 
-              <div className="min-w-0 space-y-2 sm:col-span-2">
-              <label
-                htmlFor="edit-dueDate"
-                className="text-sm font-medium text-[#00033D]"
-                >
-                  Due date
-                </label>
-              <input
+              <TaskDateInput
                 id="edit-dueDate"
-                type="text"
                 value={form.dueDate}
-                onChange={(event) => onChange("dueDate", event.target.value)}
-                inputMode="numeric"
-                pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
-                placeholder="YYYY-MM-DD"
-                aria-invalid={Boolean(errors.dueDate)}
-                aria-describedby={errors.dueDate ? "edit-dueDate-error" : undefined}
-                className="w-full max-w-full min-w-0 rounded-2xl border border-[#00033D]/12 bg-[#F9F7FC] px-4 py-3 text-base outline-none transition focus:border-[#977DFF] focus:bg-white focus:ring-4 focus:ring-[#977DFF]/12"
+                label="Due date"
+                error={errors.dueDate}
+                errorId="edit-dueDate-error"
+                onChange={(value) => onChange("dueDate", value)}
+                disabled={isSaving}
+                className="sm:col-span-2"
               />
-              {errors.dueDate ? (
-                <p id="edit-dueDate-error" className="text-sm text-[#C13274]">
-                  {errors.dueDate}
-                </p>
-              ) : null}
             </div>
-          </div>
 
             {apiError ? (
               <div className="rounded-2xl border border-[#FFCFF2] bg-[#FFF4FB] px-4 py-3 text-sm text-[#9E1F61]">

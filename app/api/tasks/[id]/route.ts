@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { applyAuthCookies, getCurrentUser } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 import { updateTaskSchema } from "@/src/lib/validations/task";
 
@@ -13,21 +13,27 @@ function parseDateOnly(value: string) {
 
 export async function PUT(request: Request, context: RouteContext) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    const auth = await getCurrentUser();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!auth.user) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const body = await request.json();
     const result = updateTaskSchema.safeParse(body);
 
     if (!result.success) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Invalid input", details: result.error.flatten() },
         { status: 400 }
       );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const { id } = await context.params;
@@ -35,12 +41,17 @@ export async function PUT(request: Request, context: RouteContext) {
     const existingTask = await prisma.task.findFirst({
       where: {
         id,
-        createdById: userId,
+        createdById: auth.user.id,
       },
     });
 
     if (!existingTask) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      const response = NextResponse.json(
+        { error: "Task not found" },
+        { status: 404 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const { title, description, status, priority, dueDate } = result.data;
@@ -71,10 +82,12 @@ export async function PUT(request: Request, context: RouteContext) {
       },
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       message: "Task updated successfully",
       task,
     });
+    applyAuthCookies(response, auth);
+    return response;
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
@@ -91,11 +104,15 @@ export async function PUT(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    const auth = await getCurrentUser();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!auth.user) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const { id } = await context.params;
@@ -103,7 +120,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const existingTask = await prisma.task.findFirst({
       where: {
         id,
-        createdById: userId,
+        createdById: auth.user.id,
       },
       select: {
         id: true,
@@ -111,14 +128,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
     });
 
     if (!existingTask) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      const response = NextResponse.json(
+        { error: "Task not found" },
+        { status: 404 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     await prisma.task.delete({
       where: { id: existingTask.id },
     });
 
-    return NextResponse.json({ message: "Task deleted successfully" });
+    const response = NextResponse.json({ message: "Task deleted successfully" });
+    applyAuthCookies(response, auth);
+    return response;
   } catch (error) {
     console.error("DELETE_TASK_ERROR", error);
 

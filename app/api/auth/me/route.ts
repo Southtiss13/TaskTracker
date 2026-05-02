@@ -1,32 +1,23 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/src/lib/prisma";
+import { applyAuthCookies, getCurrentUser } from "@/src/lib/auth";
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    const auth = await getCurrentUser();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!auth.user) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        createdAt: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json({ user });
+    const response = NextResponse.json({ user: auth.user });
+    applyAuthCookies(response, auth);
+    return response;
   } catch (error) {
     console.error("ME_ERROR", error);
 

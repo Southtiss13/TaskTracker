@@ -1,4 +1,15 @@
 import { NextResponse } from "next/server";
+import {
+  ACCESS_TOKEN_COOKIE_NAME,
+  REFRESH_TOKEN_COOKIE_NAME,
+  clearAuthCookies,
+  createAccessToken,
+  createRefreshToken,
+  getAccessTokenCookieOptions,
+  getRefreshTokenCookieOptions,
+  getRefreshTokenExpiry,
+  hashRefreshToken,
+} from "@/src/lib/auth-tokens";
 import { prisma } from "@/src/lib/prisma";
 import { verifyPassword } from "@/src/lib/password";
 import { loginSchema } from "@/src/lib/validations/auth";
@@ -25,6 +36,7 @@ export async function POST(request: Request) {
         email: true,
         fullName: true,
         passwordHash: true,
+        emailVerified: true,
       },
     });
 
@@ -44,6 +56,29 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before logging in.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
+        { status: 403 }
+      );
+    }
+
+    const accessToken = createAccessToken(user);
+    const refreshToken = createRefreshToken();
+    const now = new Date();
+
+    await prisma.refreshToken.create({
+      data: {
+        tokenHash: hashRefreshToken(refreshToken),
+        userId: user.id,
+        expiresAt: getRefreshTokenExpiry(),
+        lastActiveAt: now,
+      },
+    });
+
     const response = NextResponse.json({
       message: "Login successful",
       user: {
@@ -53,13 +88,17 @@ export async function POST(request: Request) {
       },
     });
 
-    response.cookies.set("userId", user.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    clearAuthCookies(response);
+    response.cookies.set(
+      ACCESS_TOKEN_COOKIE_NAME,
+      accessToken,
+      getAccessTokenCookieOptions()
+    );
+    response.cookies.set(
+      REFRESH_TOKEN_COOKIE_NAME,
+      refreshToken,
+      getRefreshTokenCookieOptions()
+    );
 
     return response;
   } catch (error) {

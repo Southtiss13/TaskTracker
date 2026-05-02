@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { applyAuthCookies, getCurrentUser } from "@/src/lib/auth";
 import { prisma } from "@/src/lib/prisma";
 import { createTaskSchema } from "@/src/lib/validations/task";
 
@@ -17,11 +17,15 @@ const taskFiltersSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    const auth = await getCurrentUser();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!auth.user) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const filtersResult = taskFiltersSchema.safeParse({
@@ -30,17 +34,19 @@ export async function GET(request: NextRequest) {
     });
 
     if (!filtersResult.success) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Invalid input", details: filtersResult.error.flatten() },
         { status: 400 }
       );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const { status, priority } = filtersResult.data;
 
     const tasks = await prisma.task.findMany({
       where: {
-        createdById: userId,
+        createdById: auth.user.id,
         ...(status ? { status } : {}),
         ...(priority ? { priority } : {}),
       },
@@ -49,7 +55,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ tasks });
+    const response = NextResponse.json({ tasks });
+    applyAuthCookies(response, auth);
+    return response;
   } catch (error) {
     console.error("GET_TASKS_ERROR", error);
 
@@ -62,21 +70,27 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    const auth = await getCurrentUser();
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!auth.user) {
+      const response = NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const body = await request.json();
     const result = createTaskSchema.safeParse(body);
 
     if (!result.success) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Invalid input", details: result.error.flatten() },
         { status: 400 }
       );
+      applyAuthCookies(response, auth);
+      return response;
     }
 
     const { title, description, priority, dueDate } = result.data;
@@ -87,14 +101,16 @@ export async function POST(request: Request) {
         description,
         priority,
         dueDate: dueDate ? parseDateOnly(dueDate) : undefined,
-        createdById: userId,
+        createdById: auth.user.id,
       },
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { message: "Task created successfully", task },
       { status: 201 }
     );
+    applyAuthCookies(response, auth);
+    return response;
   } catch (error) {
     if (error instanceof SyntaxError) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });

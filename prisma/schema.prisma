@@ -21,14 +21,17 @@ enum TaskPriority {
 }
 
 model User {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String   @unique @db.VarChar(255)
-  passwordHash String   @map("password_hash")
-  fullName     String   @map("full_name") @db.VarChar(150)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @unique @db.VarChar(255)
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name") @db.VarChar(150)
+  emailVerified DateTime? @map("email_verified") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  tasks Task[]
+  tasks                   Task[]
+  emailVerificationTokens EmailVerificationToken[]
+  refreshTokens           RefreshToken[]
 
   @@map("users")
 }
@@ -54,4 +57,33 @@ model Task {
   @@index([priority])
   @@index([dueDate])
   @@map("tasks")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token     String   @unique
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+model RefreshToken {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash    String   @unique @map("token_hash")
+  userId       String   @map("user_id") @db.Uuid
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz
+  lastActiveAt DateTime @default(now()) @map("last_active_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([lastActiveAt])
+  @@map("refresh_tokens")
 }

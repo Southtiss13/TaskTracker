@@ -12,7 +12,12 @@ const registerFormSchema = z
       .trim()
       .min(2, "Full name must be at least 2 characters"),
     email: z.email("Please enter a valid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must include at least one uppercase letter")
+      .regex(/[a-z]/, "Password must include at least one lowercase letter")
+      .regex(/[0-9]/, "Password must include at least one number"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -36,6 +41,25 @@ const initialForm: RegisterFormValues = {
   confirmPassword: "",
 };
 
+const passwordRequirements = [
+  {
+    label: "At least 8 characters",
+    isMet: (value: string) => value.length >= 8,
+  },
+  {
+    label: "One uppercase letter",
+    isMet: (value: string) => /[A-Z]/.test(value),
+  },
+  {
+    label: "One lowercase letter",
+    isMet: (value: string) => /[a-z]/.test(value),
+  },
+  {
+    label: "One number",
+    isMet: (value: string) => /[0-9]/.test(value),
+  },
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -43,6 +67,8 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -75,6 +101,29 @@ export default function RegisterPage() {
       isMounted = false;
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!isSuccessModalOpen) {
+      return;
+    }
+
+    const redirectTimer = window.setTimeout(() => {
+      router.replace("/login");
+    }, 3000);
+
+    const countdownTimer = window.setInterval(() => {
+      setRedirectCountdown((current) => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(redirectTimer);
+      window.clearInterval(countdownTimer);
+    };
+  }, [isSuccessModalOpen, router]);
+
+  function goToLogin() {
+    router.replace("/login");
+  }
 
   function handleChange(field: keyof RegisterFormValues, value: string) {
     setForm((current) => ({
@@ -151,7 +200,8 @@ export default function RegisterPage() {
         return;
       }
 
-      router.replace("/login");
+      setRedirectCountdown(3);
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("REGISTER_PAGE_ERROR", error);
       setApiError("Something went wrong. Please try again.");
@@ -341,6 +391,38 @@ export default function RegisterPage() {
                     {errors.password}
                   </p>
                 ) : null}
+
+                <div className="rounded-2xl border border-[#977DFF]/12 bg-[#F2E6EE]/45 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0600AB]/60">
+                    Password must include
+                  </p>
+                  <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    {passwordRequirements.map((requirement) => {
+                      const isMet = requirement.isMet(form.password);
+
+                      return (
+                        <li
+                          key={requirement.label}
+                          className={`flex items-center gap-2 font-medium transition ${
+                            isMet ? "text-[#0600AB]" : "text-[#00033D]/54"
+                          }`}
+                        >
+                          <span
+                            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold transition ${
+                              isMet
+                                ? "bg-[#0600AB] text-white shadow-[0_8px_18px_rgba(6,0,171,0.20)]"
+                                : "border border-[#977DFF]/22 bg-white text-[#00033D]/42"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {isMet ? "OK" : ""}
+                          </span>
+                          <span>{requirement.label}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -414,6 +496,49 @@ export default function RegisterPage() {
           </div>
         </section>
       </div>
+
+      {isSuccessModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[#00033D]/35 px-4 py-6 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="register-success-title"
+        >
+          <div className="w-full max-w-md rounded-[2rem] border border-[#977DFF]/18 bg-white p-7 text-center shadow-[0_32px_90px_rgba(6,0,171,0.22)] sm:p-9">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] bg-[#F2E6EE] text-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_16px_36px_rgba(151,125,255,0.16)]">
+              <span aria-hidden="true">OK</span>
+            </div>
+
+            <p className="mt-6 text-sm font-semibold uppercase tracking-[0.24em] text-[#0600AB]/60">
+              Registration successful
+            </p>
+            <h2
+              id="register-success-title"
+              className="mt-3 text-3xl font-semibold tracking-tight text-[#00033D]"
+            >
+              Check your email
+            </h2>
+            <p className="mt-4 text-sm leading-6 text-[#00033D]/70">
+              Registration successful. Please check your email to verify your
+              account. You must verify your email before logging in to
+              TaskTracker.
+            </p>
+
+            <button
+              type="button"
+              onClick={goToLogin}
+              className="mt-7 inline-flex w-full items-center justify-center rounded-2xl bg-[#0600AB] px-4 py-3 text-base font-semibold text-white shadow-[0_18px_45px_rgba(6,0,171,0.28)] transition hover:-translate-y-0.5 hover:bg-[#0033FF] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#977DFF]/25"
+            >
+              Go to login
+            </button>
+
+            <p className="mt-4 text-xs font-medium text-[#00033D]/58">
+              You will be redirected automatically in {redirectCountdown}{" "}
+              {redirectCountdown === 1 ? "second" : "seconds"}.
+            </p>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

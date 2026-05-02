@@ -22,12 +22,20 @@ const initialForm: LoginFormValues = {
   password: "",
 };
 
+const emailNotVerifiedMessage = "Please verify your email before logging in.";
+const resendVerificationSuccessMessage =
+  "If this email exists and is not verified, a verification email has been sent.";
+
 export default function LoginPage() {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [form, setForm] = useState<LoginFormValues>(initialForm);
   const [errors, setErrors] = useState<LoginFormErrors>({});
   const [apiError, setApiError] = useState("");
+  const [isEmailNotVerified, setIsEmailNotVerified] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendError, setResendError] = useState("");
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -73,6 +81,9 @@ export default function LoginPage() {
     }));
 
     setApiError("");
+    setIsEmailNotVerified(false);
+    setResendMessage("");
+    setResendError("");
   }
 
   function validateForm() {
@@ -122,11 +133,21 @@ export default function LoginPage() {
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { error?: string }
+        | { code?: string; error?: string }
         | null;
 
       if (!response.ok) {
-        setApiError(data?.error ?? "Unable to log in");
+        const isUnverified =
+          response.status === 403 &&
+          (data?.code === "EMAIL_NOT_VERIFIED" ||
+            data?.error === emailNotVerifiedMessage);
+
+        setIsEmailNotVerified(isUnverified);
+        setApiError(
+          isUnverified
+            ? emailNotVerifiedMessage
+            : data?.error ?? "Unable to log in",
+        );
         return;
       }
 
@@ -136,6 +157,44 @@ export default function LoginPage() {
       setApiError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setResendMessage("");
+    setResendError("");
+
+    const emailResult = z
+      .email("Please enter a valid email address")
+      .safeParse(form.email.trim());
+
+    if (!emailResult.success) {
+      setResendError("Enter your email address, then try again.");
+      return;
+    }
+
+    try {
+      setIsResendingVerification(true);
+
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: emailResult.data }),
+      });
+
+      if (!response.ok) {
+        setResendError("Unable to send verification email. Please try again.");
+        return;
+      }
+
+      setResendMessage(resendVerificationSuccessMessage);
+    } catch (error) {
+      console.error("RESEND_VERIFICATION_PAGE_ERROR", error);
+      setResendError("Unable to send verification email. Please try again.");
+    } finally {
+      setIsResendingVerification(false);
     }
   }
 
@@ -305,7 +364,34 @@ export default function LoginPage() {
 
               {apiError ? (
                 <div className="rounded-2xl border border-[#FFCFF2] bg-[#FFF4FB] px-4 py-3 text-sm text-[#9E1F61]">
-                  {apiError}
+                  <p>{apiError}</p>
+
+                  {isEmailNotVerified ? (
+                    <div className="mt-3 space-y-3">
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={isResendingVerification}
+                        className="inline-flex w-full items-center justify-center rounded-xl bg-[#0600AB] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(6,0,171,0.20)] transition hover:bg-[#0033FF] disabled:cursor-not-allowed disabled:bg-[#A6A8D4] disabled:shadow-none"
+                      >
+                        {isResendingVerification
+                          ? "Sending..."
+                          : "Resend verification email"}
+                      </button>
+
+                      {resendMessage ? (
+                        <p className="rounded-xl border border-[#977DFF]/14 bg-white px-3 py-2 text-[#0600AB]">
+                          {resendMessage}
+                        </p>
+                      ) : null}
+
+                      {resendError ? (
+                        <p className="rounded-xl border border-[#FFCFF2] bg-white px-3 py-2 text-[#9E1F61]">
+                          {resendError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

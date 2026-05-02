@@ -1,5 +1,10 @@
 import { hashPassword } from "@/src/lib/password";
 import { prisma } from "@/src/lib/prisma";
+import { sendVerificationEmail } from "@/src/lib/email";
+import {
+  createVerificationToken,
+  getVerificationTokenExpiry,
+} from "@/src/lib/tokens";
 import { registerSchema } from "@/src/lib/validations/auth";
 
 export const runtime = "nodejs";
@@ -50,7 +55,28 @@ export async function POST(request: Request) {
       },
     });
 
-    return Response.json({ user }, { status: 201 });
+    const token = createVerificationToken();
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: getVerificationTokenExpiry(),
+      },
+    });
+
+    await sendVerificationEmail({
+      to: user.email,
+      token,
+    });
+
+    return Response.json(
+      {
+        message:
+          "Registration successful. Please check your email to verify your account.",
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof SyntaxError) {
       return Response.json({ error: "Invalid input" }, { status: 400 });

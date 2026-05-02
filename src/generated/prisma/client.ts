@@ -51,3 +51,13 @@ export type User = Prisma.UserModel
  * 
  */
 export type Task = Prisma.TaskModel
+/**
+ * Model EmailVerificationToken
+ * 
+ */
+export type EmailVerificationToken = Prisma.EmailVerificationTokenModel
+/**
+ * Model RefreshToken
+ * 
+ */
+export type RefreshToken = Prisma.RefreshTokenModel
